@@ -1,10 +1,17 @@
 import prisma from '../database/client.js'
 import jwt from 'jsonwebtoken'
+import bcrypt from 'bcrypt'
+
+
 
 const controller = {}     // Objeto vazio
 
 controller.create = async function(req, res) {
   try {
+
+    if(req.body.password) {
+     req.body.password = await bcrypt.hash(req.body.password, 12)
+    }
 
     await prisma.user.create({ data: req.body })
 
@@ -22,7 +29,8 @@ controller.create = async function(req, res) {
 controller.retrieveAll = async function(req, res) {
   try {
     const result = await prisma.user.findMany()
-
+    { omit: { password: true } }
+    // Omitindo a senha do resultado
     // HTTP 200: OK (implícito)
     res.send(result)
   }
@@ -37,6 +45,7 @@ controller.retrieveAll = async function(req, res) {
 controller.retrieveOne = async function(req, res) {
   try {
     const result = await prisma.user.findUnique({
+       omit: { password: true } ,
       where: { id: Number(req.params.id) }
     })
 
@@ -55,6 +64,10 @@ controller.retrieveOne = async function(req, res) {
 
 controller.update = async function(req, res) {
   try {
+
+    if(req.body.password) {
+      req.body.password = await bcrypt.hash(req.body.password, 12)
+     }
 
     const result = await prisma.user.update({
       where: { id: Number(req.params.id) },
@@ -118,8 +131,11 @@ controller.login = async function(req, res) {
 
       // Usuário encontrado, vamos conferir a senha
       let passwordIsValid
-      if(req.body?.username === 'admin' && req.body?.password === 'admin123') passwordIsValid = true
-      else passwordIsValid = user.password === req.body?.password
+      
+      // Autenticação Fixa (para fins de teste)
+      // Se o usuário for admin, a senha é fixa (admin123)
+      //if(req.body?.username === 'admin' && req.body?.password === 'admin123') passwordIsValid = true
+      passwordIsValid = user.password === req.body?.password
 
       // Se a senha estiver errada, retorna
       // HTTP 401: Unauthorized
