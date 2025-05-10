@@ -1,17 +1,10 @@
 import prisma from '../database/client.js'
 import jwt from 'jsonwebtoken'
-import bcrypt from 'bcrypt'
 
 const controller = {}     // Objeto vazio
 
 controller.create = async function(req, res) {
   try {
-
-    // Verifica se existe o campo "password" e o
-    // criptografa antes de criar o novo usuário
-    if(req.body.password) {
-      req.body.password = await bcrypt.hash(req.body.password, 12)
-    }
 
     await prisma.user.create({ data: req.body })
 
@@ -28,11 +21,7 @@ controller.create = async function(req, res) {
 
 controller.retrieveAll = async function(req, res) {
   try {
-    const result = await prisma.user.findMany(
-      // Omite o campo "password" do resultado
-      // por questão de segurança
-      { omit: { password: true } }  
-    )
+    const result = await prisma.user.findMany()
 
     // HTTP 200: OK (implícito)
     res.send(result)
@@ -48,9 +37,6 @@ controller.retrieveAll = async function(req, res) {
 controller.retrieveOne = async function(req, res) {
   try {
     const result = await prisma.user.findUnique({
-      // Omite o campo "password" do resultado
-      // por questão de segurança
-      omit: { password: true },
       where: { id: Number(req.params.id) }
     })
 
@@ -69,12 +55,6 @@ controller.retrieveOne = async function(req, res) {
 
 controller.update = async function(req, res) {
   try {
-
-    // Verifica se existe o campo "password" e o
-    // criptografa antes de criar o novo usuário
-    if(req.body.password) {
-      req.body.password = await bcrypt.hash(req.body.password, 12)
-    }
 
     const result = await prisma.user.update({
       where: { id: Number(req.params.id) },
@@ -138,23 +118,12 @@ controller.login = async function(req, res) {
 
       // Usuário encontrado, vamos conferir a senha
       let passwordIsValid
-      
-      // REMOVENDO VULNERABILIDADE DE AUTENTICAÇÃO FIXA
-      // if(req.body?.username === 'admin' && req.body?.password === 'admin123') passwordIsValid = true
-      // else passwordIsValid = user.password === req.body?.password
-      // passwordIsValid = user.password === req.body?.password
-      
-      // Chamando bcrypt.compare() para verificar se o hash da senha
-      // enviada coincide com o hash da senha armazenada no BD
-      passwordIsValid = await bcrypt.compare(req.body?.password, user.password)
+      if(req.body?.username === 'admin' && req.body?.password === 'admin123') passwordIsValid = true
+      else passwordIsValid = user.password === req.body?.password
 
       // Se a senha estiver errada, retorna
       // HTTP 401: Unauthorized
       if(! passwordIsValid) return res.status(401).end()
-
-      // Remove o campo "password" do objeto "user" antes
-      // de usá-lo no token e na resposta da requisição
-      delete user.password
 
       // Usuário e senha OK, passamos ao procedimento de gerar o token
       const token = jwt.sign(
