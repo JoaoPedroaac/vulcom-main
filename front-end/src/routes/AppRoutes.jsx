@@ -1,39 +1,28 @@
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 
-import Homepage from '../pages/Homepage'
+import AuthGuard from './AuthGuard'
 
-import CarForm from '../pages/car/CarForm'
-import CarList from '../pages/car/CarList'
-
-import CustomerForm from '../pages/customer/CustomerForm'
-import CustomerList from '../pages/customer/CustomerList'
-
-import UserList from '../pages/user/UserList'
-import UserForm from '../pages/user/UserForm'
-
-import Login from '../pages/Login'
+import { routes, NO_USER } from './routes'
 
 export default function AppRoutes() {
   return <Routes>
-    <Route path="/" element={ <Homepage /> } />
+    {
+      routes.map(route => {
+        let element
+        if(route.userLevel > NO_USER) {
+          element = <AuthGuard userLevel={route.userLevel}>
+            { route.element }
+          </AuthGuard>
+        }
+        else element = route.element
 
-    <Route path="/login" element={ <Login /> } />
-
-    <Route path="/cars" element={ <CarList /> } />
-    <Route path="/cars/new" element={ <CarForm /> } />
-    <Route path="/cars/:id" element={ <CarForm /> } />
-
-    <Route path="/customers" element={ 
-      <CustomerList /> 
-    } />
-    
-    <Route path="/customers/new" element={ <CustomerForm />} />
-    <Route path="/customers/:id" element={ <CustomerForm />  } />
-
-    <Route path="/users" element={ <UserList /> } />
-    <Route path="/users/new" element={ <UserForm /> } />
-    <Route path="/users/:id" element={ <UserForm /> } />
-    
+        return <Route
+          key={route.path}
+          path={route.path}
+          element={element}
+        />
+      })
+    }    
   </Routes>
 }

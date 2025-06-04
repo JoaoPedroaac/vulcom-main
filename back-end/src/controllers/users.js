@@ -1,10 +1,21 @@
 import prisma from '../database/client.js'
 import jwt from 'jsonwebtoken'
+import bcrypt from 'bcrypt'
 
 const controller = {}     // Objeto vazio
 
 controller.create = async function(req, res) {
   try {
+
+    // Somente usuários administradores podem acessar este recurso
+    // HTTP 403: Forbidden
+    if(! req?.authUser?.is_admin) return res.status(403).end()
+
+    // Verifica se existe o campo "password" e o
+    // criptografa antes de criar o novo usuário
+    if(req.body.password) {
+      req.body.password = await bcrypt.hash(req.body.password, 12)
+    }
 
     await prisma.user.create({ data: req.body })
 
@@ -21,7 +32,16 @@ controller.create = async function(req, res) {
 
 controller.retrieveAll = async function(req, res) {
   try {
-    const result = await prisma.user.findMany()
+
+    // Somente usuários administradores podem acessar este recurso
+    // HTTP 403: Forbidden
+    if(! req?.authUser?.is_admin) return res.status(403).end()
+
+    const result = await prisma.user.findMany(
+      // Omite o campo "password" do resultado
+      // por questão de segurança
+      { omit: { password: true } }  
+    )
 
     // HTTP 200: OK (implícito)
     res.send(result)
@@ -36,7 +56,18 @@ controller.retrieveAll = async function(req, res) {
 
 controller.retrieveOne = async function(req, res) {
   try {
+
+    // Somente usuários administradores ou o próprio usuário
+    // autenticado podem acessar este recurso
+    // HTTP 403: Forbidden
+    if(! (req?.authUser?.is_admin || 
+      Number(req?.authUser?.id) === Number(req.params.id))) 
+      return res.status(403).end()
+
     const result = await prisma.user.findUnique({
+      // Omite o campo "password" do resultado
+      // por questão de segurança
+      omit: { password: true },
       where: { id: Number(req.params.id) }
     })
 
@@ -55,6 +86,16 @@ controller.retrieveOne = async function(req, res) {
 
 controller.update = async function(req, res) {
   try {
+
+    // Somente usuários administradores podem acessar este recurso
+    // HTTP 403: Forbidden
+    if(! req?.authUser?.is_admin) return res.status(403).end()
+
+    // Verifica se existe o campo "password" e o
+    // criptografa antes de criar o novo usuário
+    if(req.body.password) {
+      req.body.password = await bcrypt.hash(req.body.password, 12)
+    }
 
     const result = await prisma.user.update({
       where: { id: Number(req.params.id) },
@@ -76,6 +117,11 @@ controller.update = async function(req, res) {
 
 controller.delete = async function(req, res) {
   try {
+
+    // Somente usuários administradores podem acessar este recurso
+    // HTTP 403: Forbidden
+    if(! req?.authUser?.is_admin) return res.status(403).end()
+
     await prisma.user.delete({
       where: { id: Number(req.params.id) }
     })
@@ -118,12 +164,23 @@ controller.login = async function(req, res) {
 
       // Usuário encontrado, vamos conferir a senha
       let passwordIsValid
-      if(req.body?.username === 'admin' && req.body?.password === 'admin123') passwordIsValid = true
-      else passwordIsValid = user.password === req.body?.password
+      
+      // REMOVENDO VULNERABILIDADE DE AUTENTICAÇÃO FIXA
+      // if(req.body?.username === 'admin' && req.body?.password === 'admin123') passwordIsValid = true
+      // else passwordIsValid = user.password === req.body?.password
+      // passwordIsValid = user.password === req.body?.password
+      
+      // Chamando bcrypt.compare() para verificar se o hash da senha
+      // enviada coincide com o hash da senha armazenada no BD
+      passwordIsValid = await bcrypt.compare(req.body?.password, user.password)
 
       // Se a senha estiver errada, retorna
       // HTTP 401: Unauthorized
       if(! passwordIsValid) return res.status(401).end()
+
+      // Remove o campo "password" do objeto "user" antes
+      // de usá-lo no token e na resposta da requisição
+      delete user.password
 
       // Usuário e senha OK, passamos ao procedimento de gerar o token
       const token = jwt.sign(
@@ -143,7 +200,7 @@ controller.login = async function(req, res) {
 
       // Retorna o token e o usuário autenticado com
       // HTTP 200: OK (implícito)
-      res.send({token, user})
+      res.send({user})
 
   }
   catch(error) {
@@ -152,6 +209,13 @@ controller.login = async function(req, res) {
     // HTTP 500: Internal Server Error
     res.status(500).end()
   }
+}
+
+controller.logout = function(req, res) {
+  // Apaga no front-end o cookie que armazena o token
+  res.clearCookie(process.env.AUTH_COOKIE_NAME)
+  // HTTP 204: No Content
+  res.status(204).end()
 }
 
 controller.me = function(req, res) {
