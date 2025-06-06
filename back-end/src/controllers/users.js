@@ -71,6 +71,12 @@ controller.retrieveOne = async function(req, res) {
       where: { id: Number(req.params.id) }
     })
 
+    // Somente usuários administradores podem acessar esse recurso
+    // Ou usuários com o mesmo ID do usuário que está sendo consultado
+    if(! (req?.authUser?.isAdmin || 
+      Number(req?.authUser?.id) !== Number(req.params.id)))
+      return res.status(403).end()
+
     // Encontrou ~> retorna HTTP 200: OK (implícito)
     if(result) res.send(result)
     // Não encontrou ~> retorna HTTP 404: Not Found
@@ -125,6 +131,9 @@ controller.delete = async function(req, res) {
     await prisma.user.delete({
       where: { id: Number(req.params.id) }
     })
+
+    //Somente usuários administradores podem acessar esse recurso
+    if(! req?.authUser?.isAdmin) {return res.status(403).end()}
 
     // Encontrou e excluiu ~> HTTP 204: No Content
     res.status(204).end()

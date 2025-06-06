@@ -9,7 +9,7 @@ import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale/pt-BR'
-import React from 'react'
+import React, { useState } from 'react'
 import InputMask from 'react-input-mask'
 import { useNavigate, useParams } from 'react-router-dom'
 import myfetch from '../../lib/myfetch'
@@ -83,6 +83,10 @@ export default function CarForm() {
   // car.imported = imported
   const handleImportedChange = (event) => {
     setImported(event.target.checked)
+    // Update the car state as well
+    const carCopy = { ...car }
+    carCopy.imported = event.target.checked
+    setState({ ...state, car: carCopy, formModified: true })
   }
 
   function handleFieldChange(event) {
@@ -185,6 +189,31 @@ export default function CarForm() {
     }
   }
 
+  const [errors, setErrors] = useState({})
+
+  const validate = () => {
+    const newErrors = {}
+    // Remove spaces and dashes for length validation
+    const cleanPlates = car.plates.replace(/[\s-]/g, '')
+    if (!car.plates || cleanPlates.length !== 7) {
+      newErrors.plates = "Placa deve ter 7 caracteres."
+    }
+    if (!car.model) {
+      newErrors.model = "Modelo é obrigatório."
+    }
+    if (!car.year_manufacture || isNaN(car.year_manufacture) || car.year_manufacture < 1960 || car.year_manufacture > currentYear) {
+      newErrors.year_manufacture = "Ano inválido."
+    }
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!validate()) return
+    handleFormSubmit(e)
+  }
+
   return (
     <>
       <ConfirmDialog />
@@ -196,7 +225,7 @@ export default function CarForm() {
       </Typography>
 
       <Box className='form-fields'>
-        <form onSubmit={handleFormSubmit}>
+        <form onSubmit={handleSubmit}>
           <TextField
             name='brand'
             label='Marca do carro'
@@ -219,6 +248,7 @@ export default function CarForm() {
             helperText={inputErrors?.model}
             error={inputErrors?.model}
           />
+          {errors.model && <span style={{ color: 'red' }}>{errors.model}</span>}
 
           <TextField
             name='color'
@@ -257,6 +287,7 @@ export default function CarForm() {
               </MenuItem>
             ))}
           </TextField>
+          {errors.year_manufacture && <span style={{ color: 'red' }}>{errors.year_manufacture}</span>}
 
           <div class="MuiFormControl-root">
             <FormControlLabel
@@ -288,11 +319,12 @@ export default function CarForm() {
                 variant='filled'
                 required
                 fullWidth
-                helperText={inputErrors?.phone}
-                error={inputErrors?.phone}
+                helperText={errors.plates || inputErrors?.plates}
+                error={Boolean(errors.plates || inputErrors?.plates)}
               />
             )}
           </InputMask>
+          {errors.plates && <span style={{ color: 'red' }}>{errors.plates}</span>}
 
           <LocalizationProvider
             dateAdapter={AdapterDateFns}
